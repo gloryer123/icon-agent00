@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/school_db?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
+    username: root
+    password: 12345678
+
+mybatis:
+  # 指定 XML 映射文件的位置
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    # 开启驼峰命名自动映射 (tuition_rmb -> tuitionRmb)
+    map-underscore-to-camel-case: true

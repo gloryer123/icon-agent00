@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.wzj.agent00.mapper.SchoolMapper">
+
+    <select id="getAllSchools" resultType="com.wzj.agent00.entity.SchoolDAO">
+        SELECT * FROM schools
+    </select>
+
+</mapper>
