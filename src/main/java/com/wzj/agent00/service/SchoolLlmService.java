@@ -16,12 +16,14 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 public class SchoolLlmService {
-    private static final String API_URL = "http://192.168.111.201:11434/api/generate";
-    private static final String MODEL_NAME = "qwen3.5:9b";
+    private static final String API_URL = "http://154.44.25.190:11434/api/generate";
+    private static final String MODEL_NAME = "qwen3.5-9b-q8:latest";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -31,20 +33,38 @@ public class SchoolLlmService {
     /**
      * 根据需求获取推荐
      */
-    public String getRecommendation(String userRequirement) throws Exception {
-        // 1. 获取并格式化数据库数据
+    public Map<String, Object> getRecommendation(String userRequirement) throws Exception {
+        Map<String, Object> resultMap = new HashMap<>();
+
+        // 1. 获取并格式化数据库数据Map格式
         String schoolData = getFormattedSchoolData();
         if (schoolData.isEmpty()) {
-            return "系统内部错误：暂无学校数据";
+            resultMap.put("code", 500);
+            resultMap.put("msg", "系统内部错误：暂无学校数据");
+            resultMap.put("data", null);
+            return resultMap;
         }
+
+//        // 1. 获取并格式化数据库数据String格式
+//        String schoolData = getFormattedSchoolData();
+//        if (schoolData.isEmpty()) {
+//            return "系统内部错误：暂无学校数据";
+//        }
         log.info("成功获取学校数据，当前数据长度: {} 字符，即将进入 Prompt 构建与模型调用环节...", schoolData.length());
 
         // 2. 构建 Prompt
         String prompt = buildPrompt(schoolData, userRequirement);
         log.info("已构建Prompt: \n {}", prompt);
 
+        String llmResult = callLlmApi(prompt);
+
+        // 包装为规范的 JSON 结构
+        resultMap.put("code", 200);
+        resultMap.put("msg", "success");
+        resultMap.put("data", llmResult);
+
         // 3. 调用大模型并返回结果
-        return callLlmApi(prompt);
+        return resultMap;
     }
 
     /**
@@ -119,6 +139,10 @@ public class SchoolLlmService {
     }
 
     private String extractResponseFromJson(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return "解析异常：模型返回的数据为空";
+        }
+
         try {
             StringBuilder fullResponse = new StringBuilder();
 
@@ -140,10 +164,24 @@ public class SchoolLlmService {
                 }
             }
 
-            if (!fullResponse.isEmpty()) {
-                return fullResponse.toString();
+            String finalRes = fullResponse.toString().trim();
+
+            if (!finalRes.isEmpty()) {
+                // 查找 "你好" 第一次出现的位置
+                Matcher matcher = Pattern.compile("你好|您好").matcher(finalRes);
+                // 如果匹配到了，取起始索引；如果没有，返回 -1
+                int startIndex = matcher.find() ? matcher.start() : -1;
+
+                if (startIndex != -1) {
+                    // 如果找到了，就从 "你好" 开始截取到最后
+                    return finalRes.substring(startIndex).trim();
+                } else {
+                    // 如果没找到 "你好"，为了防止丢数据，返回全部内容，并记录一条警告
+                    log.warn("在模型的 response 中未找到 '你好' 作为起始标识，返回完整 response 内容。");
+                    return finalRes;
+                }
             } else {
-                log.error("模型返回的数据中未找到任何 'response' 字段: {}", json);
+                log.error("模型返回的数据中未找到任何有效的 'response' 内容: \n{}", json);
                 return "解析异常：无法获取模型回答";
             }
 

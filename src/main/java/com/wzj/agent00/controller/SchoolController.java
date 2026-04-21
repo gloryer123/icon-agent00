@@ -1,31 +1,48 @@
 package com.wzj.agent00.controller;
 
+import com.wzj.agent00.entity.dto.RequirementRequest;
 import com.wzj.agent00.service.SchoolLlmService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
+
+@Tag(name = "智能择校接口", description = "基于大模型的学校分析与推荐服务")
 @RestController
 @RequestMapping("/api/school")
 public class SchoolController {
+
     @Autowired
     private SchoolLlmService schoolLlmService;
 
-    /**
-     * 接收用户需求并返回大模型推荐结果
-     * 访问示例: GET http://localhost:8080/api/school/recommend?requirement=我想找国外的理工科学校
-     */
+    @Operation(summary = "通过 URL 参数获取推荐", description = "接收普通的查询字符串参数，返回大模型的择校建议文本")
     @GetMapping("/recommend")
-    public String recommendSchool(@RequestParam("requirement") String userRequirement) {
+    public Map<String, Object> recommendSchool(
+            @Parameter(description = "择校需求描述，如：我想找北京的公立理工科学校", required = true)
+            @RequestParam("requirement") String userRequirement) throws Exception {
+        return schoolLlmService.getRecommendation(userRequirement);
+    }
+
+    @Operation(summary = "通过 JSON 对象获取推荐", description = "接收包含需求的 JSON 实体，适用于更复杂或长文本的交互场景")
+    @PostMapping("/recommendjson")
+    public Map<String, Object> recommendSchoolFromJson(@RequestBody RequirementRequest request) {
         try {
-            // 调用 Service 层处理业务
-            String recommendation = schoolLlmService.getRecommendation(userRequirement);
+            String userRequirement = request.getRequirement();
+            Map<String, Object> recommendation = schoolLlmService.getRecommendation(userRequirement);
             return recommendation;
         } catch (Exception e) {
             e.printStackTrace();
-            return "处理推荐请求时发生异常：" + e.getMessage();
+            // 如果代码出错，我们也手动构建一个规范的 JSON 返回回去
+            Map<String, Object> errorMap = new HashMap<>();
+            errorMap.put("code", 500);
+            errorMap.put("msg", "处理推荐请求时发生异常：" + e.getMessage());
+            errorMap.put("data", null);
+            return errorMap;
         }
     }
 }

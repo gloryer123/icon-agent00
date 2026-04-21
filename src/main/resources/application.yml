@@ -11,3 +11,14 @@ mybatis:
   configuration:
     # 开启驼峰命名自动映射 (tuition_rmb -> tuitionRmb)
     map-underscore-to-camel-case: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+# Knife4j 增强配置
+knife4j:
+  enable: true # 开启增强功能
+  setting:
+    language: zh_cn # 界面语言
