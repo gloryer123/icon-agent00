@@ -21,7 +21,7 @@ public class SchoolController {
     private SchoolLlmService schoolLlmService;
 
     @Operation(summary = "通过 URL 参数获取推荐", description = "接收普通的查询字符串参数，返回大模型的择校建议文本")
-    @GetMapping("/recommend")
+    @GetMapping("/recommendURL")
     public Map<String, Object> recommendSchool(
             @Parameter(description = "择校需求描述，如：我想找北京的公立理工科学校", required = true)
             @RequestParam("requirement") String userRequirement) throws Exception {
@@ -29,7 +29,7 @@ public class SchoolController {
     }
 
     @Operation(summary = "通过 JSON 对象获取推荐", description = "接收包含需求的 JSON 实体，适用于更复杂或长文本的交互场景")
-    @PostMapping("/recommendjson")
+    @PostMapping("/recommend")
     public Map<String, Object> recommendSchoolFromJson(@RequestBody RequirementRequest request) {
         try {
             String userRequirement = request.getRequirement();

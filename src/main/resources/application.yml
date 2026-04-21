@@ -22,3 +22,8 @@ knife4j:
   enable: true # 开启增强功能
   setting:
     language: zh_cn # 界面语言
+
+# 大模型相关配置
+llm:
+  api-url: http://154.44.25.190:11434/api/generate
+  model-name: qwen3.5-9b-q8:latest

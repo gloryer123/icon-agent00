@@ -2,6 +2,7 @@ package com.wzj.agent00.service;
 
 import com.wzj.agent00.mapper.SchoolMapper;
 import com.wzj.agent00.entity.SchoolDAO;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,8 +23,11 @@ import java.util.regex.Pattern;
 @Slf4j
 @Service
 public class SchoolLlmService {
-    private static final String API_URL = "http://154.44.25.190:11434/api/generate";
-    private static final String MODEL_NAME = "qwen3.5-9b-q8:latest";
+    @Value("${llm.api-url}")
+    private String apiUrl;
+
+    @Value("${llm.model-name}")
+    private String modelName;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -79,14 +83,16 @@ public class SchoolLlmService {
         StringBuilder sb = new StringBuilder();
         int count = 1;
         for (SchoolDAO s : schools) {
-            sb.append(count).append(". ")
-                    .append(s.getName()).append(": ")
-                    .append("地点-").append(s.getCountry()).append(" ").append(s.getRegion()).append(", ")
-                    .append("类型-").append(s.getIsPublic() == 1 ? "公立" : "私立").append(s.getCategory()).append(", ")
-                    .append("学制-").append(s.getDurationStr()).append(", ")
-                    .append("学费-约").append(s.getTuitionRmb()).append("人民币/学年, ")
-                    .append("特色-").append(s.getFeatures()).append("\n");
-            count++;
+            if (s.getStatus() == 1) {
+                sb.append(count).append(". ")
+                        .append(s.getName()).append(": ")
+                        .append("地点-").append(s.getCountry()).append(" ").append(s.getRegion()).append(", ")
+                        .append("类型-").append(s.getIsPublic() == 1 ? "公立" : "私立").append(s.getCategory()).append(", ")
+                        .append("学制-").append(s.getDurationStr()).append(", ")
+                        .append("学费-约").append(s.getTuitionRmb()).append("人民币/学年, ")
+                        .append("特色-").append(s.getFeatures()).append("\n");
+                count++;
+            }
         }
         return sb.toString();
     }
@@ -103,7 +109,7 @@ public class SchoolLlmService {
     private String callLlmApi(String prompt) throws Exception {
         // 使用 Map 构建请求体，Jackson 会自动处理所有特殊字符（换行、双引号等）的转义
         Map<String, Object> requestMap = new HashMap<>();
-        requestMap.put("model", MODEL_NAME);
+        requestMap.put("model", modelName);
         requestMap.put("prompt", prompt);
         requestMap.put("stream", false);
 
@@ -122,7 +128,7 @@ public class SchoolLlmService {
                 .build();
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(API_URL))
+                .uri(URI.create(apiUrl))
                 .header("Content-Type", "application/json")
                 .timeout(Duration.ofMinutes(5))
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -165,19 +171,21 @@ public class SchoolLlmService {
             }
 
             String finalRes = fullResponse.toString().trim();
+            log.info("【大模型原始完整输出 (包含 Think 和 Response)】:\n{}", finalRes);
+
 
             if (!finalRes.isEmpty()) {
-                // 查找 "你好" 第一次出现的位置
-                Matcher matcher = Pattern.compile("你好|您好").matcher(finalRes);
-                // 如果匹配到了，取起始索引；如果没有，返回 -1
-                int startIndex = matcher.find() ? matcher.start() : -1;
+                // 策略 1：寻找模型的思维结束标签 </think>
+                int thinkEndIndex = finalRes.indexOf("</think>");
 
-                if (startIndex != -1) {
-                    // 如果找到了，就从 "你好" 开始截取到最后
-                    return finalRes.substring(startIndex).trim();
-                } else {
+                if (thinkEndIndex != -1) {
+                    // 如果找到了 </think>，直接把这个标签及其之前的所有“草稿”全部丢弃
+                    return finalRes.substring(thinkEndIndex + "</think>".length()).trim();
+                }
+
+                else {
                     // 如果没找到 "你好"，为了防止丢数据，返回全部内容，并记录一条警告
-                    log.warn("在模型的 response 中未找到 '你好' 作为起始标识，返回完整 response 内容。");
+                    log.warn("在模型的 response 中未找到 'think' 作为起始标识，返回完整 response 内容。");
                     return finalRes;
                 }
             } else {
