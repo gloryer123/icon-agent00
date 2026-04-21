@@ -1,9 +1,24 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/school_db?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
+    url: jdbc:mysql://localhost:13306/school_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
     username: root
-    password: 12345678
+    password: 123456
+
+  data:
+    redis:
+      host: localhost
+      port: 16379
+      # 如果你在挂载的 redis.conf 中配置了 requirepass，在这里写上你的密码；如果没有配密码，留空即可
+      password:
+      database: 0 # 默认使用 0 号库
+      # 可选：连接池配置（引入了 commons-pool2 依赖才生效）
+      lettuce:
+        pool:
+          max-active: 8    # 连接池最大连接数
+          max-idle: 8      # 连接池中的最大空闲连接
+          min-idle: 0      # 连接池中的最小空闲连接
+          max-wait: 10000ms # 连接池最大阻塞等待时间
 
 mybatis:
   # 指定 XML 映射文件的位置

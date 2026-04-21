@@ -2,10 +2,13 @@ package com.wzj.agent00.service;
 
 import com.wzj.agent00.mapper.SchoolMapper;
 import com.wzj.agent00.entity.SchoolDAO;
+import com.wzj.agent00.types.enums.ResponseCode;
+import com.wzj.agent00.types.exeption.AppException;
 import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -17,8 +20,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -34,19 +35,22 @@ public class SchoolLlmService {
     @Autowired
     private SchoolMapper schoolMapper;
 
+    @Autowired
+    private ShortMemoryService shortMemoryService;
+
     /**
      * 根据需求获取推荐
      */
-    public Map<String, Object> getRecommendation(String userRequirement) throws Exception {
-        Map<String, Object> resultMap = new HashMap<>();
+    public String getRecommendation(String sessionId, String userRequirement) throws Exception {
+        if (sessionId == null || sessionId.isEmpty()) {
+            throw new AppException(ResponseCode.NO_SESSION);
+        }
+//        Map<String, Object> resultMap = new HashMap<>();
 
         // 1. 获取并格式化数据库数据Map格式
         String schoolData = getFormattedSchoolData();
         if (schoolData.isEmpty()) {
-            resultMap.put("code", 500);
-            resultMap.put("msg", "系统内部错误：暂无学校数据");
-            resultMap.put("data", null);
-            return resultMap;
+            throw new AppException(ResponseCode.NO_SCHOOL_DATA);
         }
 
 //        // 1. 获取并格式化数据库数据String格式
@@ -56,19 +60,25 @@ public class SchoolLlmService {
 //        }
         log.info("成功获取学校数据，当前数据长度: {} 字符，即将进入 Prompt 构建与模型调用环节...", schoolData.length());
 
+        String historyContext = shortMemoryService.getHistoryContext(sessionId);
+
         // 2. 构建 Prompt
-        String prompt = buildPrompt(schoolData, userRequirement);
+        String prompt = buildPrompt(schoolData, userRequirement, historyContext);
         log.info("已构建Prompt: \n {}", prompt);
 
         String llmResult = callLlmApi(prompt);
 
-        // 包装为规范的 JSON 结构
-        resultMap.put("code", 200);
-        resultMap.put("msg", "success");
-        resultMap.put("data", llmResult);
+        // 5. 将当前这一轮的用户输入和模型输出存入 Redis 记忆中
+        shortMemoryService.addMessage(sessionId, "User", userRequirement);
+        shortMemoryService.addMessage(sessionId, "Assistant", llmResult);
+
+//        // 包装为规范的 JSON 结构
+//        resultMap.put("code", 200);
+//        resultMap.put("msg", "success");
+//        resultMap.put("data", llmResult);
 
         // 3. 调用大模型并返回结果
-        return resultMap;
+        return llmResult;
     }
 
     /**
@@ -97,13 +107,27 @@ public class SchoolLlmService {
         return sb.toString();
     }
 
-    private String buildPrompt(String data, String requirement) {
-        return String.format(
-                "你是爱康优申集团的一个专业的智能择校助手。请严格基于我提供的【学校数据库】信息，分析【用户需求】，推荐最匹配的一所或多所学校，并用中文分点说明推荐理由。\n\n" +
-                        "【学校数据库】:\n%s\n" +
-                        "【用户需求】:\n%s",
-                data, requirement
-        );
+    private String buildPrompt(String data, String requirement,  String historyContext) {
+        StringBuilder promptBuilder = new StringBuilder();
+        promptBuilder.append("你是爱康优申集团的一个专业的智能择校助手。请严格基于我提供的【学校数据库】信息，分析【用户需求】，推荐最匹配的一所或多所学校，并用中文分点说明推荐理由。");
+        promptBuilder.append("你需要参考【历史对话记录】（如果有）来理解用户的上下文语境。\n\n");
+
+        promptBuilder.append("【学校数据库】:\n").append(data).append("\n\n");
+
+        if (StringUtils.hasText(historyContext)) {
+            promptBuilder.append("【历史对话记录】:\n").append(historyContext).append("\n\n");
+        }
+
+        promptBuilder.append("【当前用户输入】:\n").append(requirement);
+
+        return promptBuilder.toString();
+
+//        return String.format(
+//                "你是爱康优申集团的一个专业的智能择校助手。请严格基于我提供的【学校数据库】信息，分析【用户需求】，推荐最匹配的一所或多所学校，并用中文分点说明推荐理由。\n\n" +
+//                        "【学校数据库】:\n%s\n" +
+//                        "【用户需求】:\n%s",
+//                data, requirement
+//        );
     }
 
     private String callLlmApi(String prompt) throws Exception {
@@ -140,11 +164,11 @@ public class SchoolLlmService {
             return extractResponseFromJson(response.body());
         } else {
             log.error("API 调用失败，状态码: {}, 响应内容: {}", response.statusCode(), response.body());
-            throw new RuntimeException("HTTP 状态码异常: " + response.statusCode());
+            throw new AppException(ResponseCode.LLM_API_ERROR);
         }
     }
 
-    private String extractResponseFromJson(String json) {
+    private String extractResponseFromJson(String json) throws Exception {
         if (json == null || json.trim().isEmpty()) {
             return "解析异常：模型返回的数据为空";
         }
@@ -197,7 +221,7 @@ public class SchoolLlmService {
             log.error("解析模型响应 JSON 时发生错误: {}", e.getMessage(), e);
             // 打印出引发报错的原始字符串，方便排查
             log.error("导致报错的原始返回数据: \n{}", json);
-            return "解析异常：JSON 格式错误";
+            throw new AppException(ResponseCode.LLM_PARSE_ERROR);
         }
     }
 }
