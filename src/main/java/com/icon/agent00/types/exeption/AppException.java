@@ -1,6 +1,6 @@
-package com.wzj.agent00.types.exeption;
+package com.icon.agent00.types.exeption;
 
-import com.wzj.agent00.types.enums.ResponseCode;
+import com.icon.agent00.types.enums.ResponseCode;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -42,7 +42,7 @@ public class AppException extends Exception {
 
     @Override
     public String toString() {
-        return "com.wzj.agent00.types.exception.AppException{" +
+        return "com.icon.agent00.types.exception.AppException{" +
                 "code='" + code + '\'' +
                 ", info='" + info + '\'' +
                 '}';

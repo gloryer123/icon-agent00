@@ -1,4 +1,4 @@
-package com.wzj.agent00.entity.dto;
+package com.icon.agent00.entity.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

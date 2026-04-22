@@ -1,4 +1,4 @@
-package com.wzj.agent00;
+package com.icon.agent00;
 
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 // 告诉 Spring Boot 去哪个包下扫描 MyBatis 的 Mapper 接口
-@MapperScan("com.wzj.agent00.mapper")
+@MapperScan("com.icon.agent00.mapper")
 public class Agent00Application {
 
     public static void main(String[] args) {

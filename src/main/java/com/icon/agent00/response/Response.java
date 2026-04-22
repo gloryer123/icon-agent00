@@ -1,4 +1,4 @@
-package com.wzj.agent00.response;
+package com.icon.agent00.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

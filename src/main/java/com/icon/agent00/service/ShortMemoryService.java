@@ -1,4 +1,4 @@
-package com.wzj.agent00.service;
+package com.icon.agent00.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +22,23 @@ public class ShortMemoryService {
     private static final String REDIS_KEY_PREFIX = "llm:chat:memory:";
     private static final int MAX_HISTORY_MESSAGES = 10; // 保留最近的10条对话（5轮）
     private static final long MEMORY_EXPIRE_MINUTES = 30; // 短期记忆保留时间：30分钟
+
+    private static final String HISTORY_PREFIX = "chat:history:";
+    private static final String SUMMARY_PREFIX = "chat:summary:";
+
+    /**
+     * 获取当前摘要
+     */
+    public String getSummary(String sessionId) {
+        return stringRedisTemplate.opsForValue().get(SUMMARY_PREFIX + sessionId);
+    }
+
+    /**
+     * 更新摘要（由 Service 调用 LLM 生成后存入）
+     */
+    public void saveSummary(String sessionId, String newSummary) {
+        stringRedisTemplate.opsForValue().set(SUMMARY_PREFIX + sessionId, newSummary, 24, TimeUnit.HOURS);
+    }
 
     /**
      * 追加对话记录到 Redis

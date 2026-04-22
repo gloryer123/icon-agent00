@@ -1,6 +1,6 @@
-package com.wzj.agent00.mapper;
+package com.icon.agent00.mapper;
 
-import com.wzj.agent00.entity.SchoolDAO;
+import com.icon.agent00.entity.SchoolDAO;
 import org.apache.ibatis.annotations.Mapper;
 import java.util.List;
 

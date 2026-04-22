@@ -1,4 +1,4 @@
-package com.wzj.agent00.service;
+package com.icon.agent00.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -1,10 +1,10 @@
-package com.wzj.agent00.controller;
+package com.icon.agent00.controller;
 
-import com.wzj.agent00.entity.dto.RequirementRequest;
-import com.wzj.agent00.response.Response;
-import com.wzj.agent00.service.SchoolLlmService;
-import com.wzj.agent00.types.enums.ResponseCode;
-import com.wzj.agent00.types.exeption.AppException;
+import com.icon.agent00.entity.dto.RequirementRequest;
+import com.icon.agent00.response.Response;
+import com.icon.agent00.service.SchoolLlmService;
+import com.icon.agent00.types.enums.ResponseCode;
+import com.icon.agent00.types.exeption.AppException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;

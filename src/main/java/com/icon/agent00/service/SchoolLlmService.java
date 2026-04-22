@@ -1,9 +1,9 @@
-package com.wzj.agent00.service;
+package com.icon.agent00.service;
 
-import com.wzj.agent00.mapper.SchoolMapper;
-import com.wzj.agent00.entity.SchoolDAO;
-import com.wzj.agent00.types.enums.ResponseCode;
-import com.wzj.agent00.types.exeption.AppException;
+import com.icon.agent00.mapper.SchoolMapper;
+import com.icon.agent00.entity.SchoolDAO;
+import com.icon.agent00.types.enums.ResponseCode;
+import com.icon.agent00.types.exeption.AppException;
 import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

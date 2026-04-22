@@ -1,4 +1,4 @@
-package com.wzj.agent00.entity;
+package com.icon.agent00.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

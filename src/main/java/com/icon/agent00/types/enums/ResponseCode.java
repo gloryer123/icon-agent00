@@ -1,4 +1,4 @@
-package com.wzj.agent00.types.enums;
+package com.icon.agent00.types.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
