@@ -3,7 +3,9 @@ package com.icon.agent00;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 
+@EnableAsync // 开启多线程代理
 @SpringBootApplication
 // 告诉 Spring Boot 去哪个包下扫描 MyBatis 的 Mapper 接口
 @MapperScan("com.icon.agent00.mapper")

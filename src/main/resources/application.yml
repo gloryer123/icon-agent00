@@ -1,4 +1,12 @@
 spring:
+  ai:
+    openai:
+      base-url: http://154.44.25.190:11434
+      api-key: ollama-dummy-key
+      chat:
+        options:
+          model: qwen3.5-9b-q8:latest
+
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:13306/school_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
@@ -7,18 +15,16 @@ spring:
 
   data:
     redis:
-      host: localhost
-      port: 16379
-      # 如果你在挂载的 redis.conf 中配置了 requirepass，在这里写上你的密码；如果没有配密码，留空即可
-      password:
-      database: 0 # 默认使用 0 号库
-      # 可选：连接池配置（引入了 commons-pool2 依赖才生效）
+      host: 192.168.110.110
+      port: 6379
+      password: LrhiaBMY8oRdzKP4TDdN
+      database: 6
       lettuce:
         pool:
-          max-active: 8    # 连接池最大连接数
-          max-idle: 8      # 连接池中的最大空闲连接
-          min-idle: 0      # 连接池中的最小空闲连接
-          max-wait: 10000ms # 连接池最大阻塞等待时间
+          max-active: 8
+          max-wait: -1
+          max-idle: 8
+          min-idle: 0
 
 mybatis:
   # 指定 XML 映射文件的位置
@@ -38,7 +44,7 @@ knife4j:
   setting:
     language: zh_cn # 界面语言
 
-# 大模型相关配置
-llm:
-  api-url: http://154.44.25.190:11434/api/generate
-  model-name: qwen3.5-9b-q8:latest
+## 大模型相关配置
+#llm:
+#  api-url: http://154.44.25.190:11434/api/generate
+#  model-name: qwen3.5-9b-q8:latest
