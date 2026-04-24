@@ -1,14 +1,20 @@
 package com.icon.agent00.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.icon.agent00.entity.ChatMessageDAO;
 import com.icon.agent00.types.enums.ResponseCode;
 import com.icon.agent00.types.exeption.AppException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -19,19 +25,19 @@ import java.util.concurrent.TimeUnit;
  */
 public class LongMemoryService {
 
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Autowired
-    private LlmApiClient llmApiClient;
 
     private static final String SUMMARY_MEMORY_PREFIX = "llm:summary:memory:";
 
-    private static final String JSON_TEMPLATE = "{\n" +
-            "  \"user_profile\": {\"education_bg\": \"\", \"gpa\": \"\", \"language_score\": \"\", \"budget\": \"\"},\n" +
-            "  \"preferences\": {\"target_country\": [], \"target_major\": [], \"dealbreakers\": []},\n" +
-            "  \"interaction_status\": {\"liked_schools\": [], \"rejected_schools\": [], \"current_intent\": \"\"}\n" +
-            "}";
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    private final ChatClient chatClient;
+
+    public LongMemoryService(ChatClient.Builder chatClientBuilder) {
+        // 构建一个干净的客户端，不挂载任何 Advisor
+        this.chatClient = chatClientBuilder.build();
+    }
+
 
     /**
      * 获取当前摘要
@@ -48,17 +54,15 @@ public class LongMemoryService {
     }
 
     /**
-     * 异步执行记忆压缩
+     * 记忆压缩
      */
-    @Async
-    public void handleMemoryCompression(String sessionId, String evictedMessages, String oldSummary) throws Exception {
-        if (!StringUtils.hasText(evictedMessages)) {
-            return;
-        }
+    public void handleMemoryCompression(String sessionId, String evictedMessages) throws Exception {
 
         try {
+            String oldSummary = getSummary(sessionId);
+
             long startTime = System.currentTimeMillis();
-            log.info("【异步任务】开始为用户 {} 进行记忆压缩...", sessionId);
+            log.info("开始为用户 {} 进行记忆压缩...", sessionId);
 
 //            // 构建压缩 Prompt
 //            String summaryPrompt = String.format(
@@ -68,30 +72,48 @@ public class LongMemoryService {
 
             String summaryPrompt = String.format(
                     "你是一个专业的【择校咨询记忆管理专家】。你的任务是从用户的对话中提取关键信息，并更新用户的【长期记忆 JSON 画像】。\n\n" +
-//                            "【标准画像结构】:\n%s\n\n" +
                             "【现有画像】:\n%s\n\n" +
                             "【近期对话】:\n%s\n\n" +
                             "【更新规则】:\n" +
                             "1. 严格过滤废话：忽略打招呼、口语词和无意义的闲聊。\n" +
                             "2. 信息提取与覆盖：提取新信息并更新到现有画像中。改变主意时，用新信息覆盖旧信息。\n" +
-//                            "3. 保持结构：必须严格遵循【标准画像结构】的字段名，如果没有对应信息请保持为空字符串或空数组。\n" +
                             "请输出更新后的 JSON：",
-//                    JSON_TEMPLATE,
                     oldSummary != null ? oldSummary : "{}",
                     evictedMessages
             );
 
             // 调用大模型生成新摘要
-            String newSummary = llmApiClient.callLlmForJson(summaryPrompt);
+            String newSummary = this.chatClient.prompt()
+                    .system(summaryPrompt)
+                    .options(OpenAiChatOptions.builder()
+                            .withResponseFormat(new OpenAiApi.ChatCompletionRequest.ResponseFormat(OpenAiApi.ChatCompletionRequest.ResponseFormat.Type.JSON_OBJECT))
+                            .withTemperature(0.1)
+                            .build())
+                    .call()
+                    .content();
 
             // 存回 Redis
             saveSummary(sessionId, newSummary);
-            log.info("【异步任务】记忆压缩完成，耗时: {}ms，新摘要已保存: {}", (System.currentTimeMillis() - startTime), newSummary);
+            log.info("记忆压缩完成，耗时: {}ms，新摘要已保存: {}", (System.currentTimeMillis() - startTime), newSummary);
         } catch (Exception e) {
-            log.error("【异步任务】记忆压缩发生异常", e);
+            log.error("记忆压缩发生异常", e);
             throw new AppException(ResponseCode.ERROR_IN_SUMMARY);
         }
     }
 
+    public String convertToText(List<Object> rawMessages) {
+        StringBuilder sb = new StringBuilder();
+        ObjectMapper mapper = new ObjectMapper();
+
+        for (Object obj : rawMessages) {
+            // 使用 ObjectMapper 将 LinkedHashMap 还原为 DAO
+            ChatMessageDAO dao = mapper.convertValue(obj, ChatMessageDAO.class);
+
+            // 格式化为：[USER]: 内容 或 [ASSISTANT]: 内容
+            sb.append("[").append(dao.getType().toUpperCase()).append("]: ")
+                    .append(dao.getText()).append("\n");
+        }
+        return sb.toString();
+    }
 
 }

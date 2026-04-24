@@ -2,76 +2,67 @@ package com.icon.agent00.service;
 
 import com.icon.agent00.types.enums.ResponseCode;
 import com.icon.agent00.types.exeption.AppException;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi.ChatCompletionRequest;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
+
 
 @Service
 @Slf4j
 public class LlmApiClient {
+
     private final ChatClient chatClient;
+    private final ChatMemory chatMemory;
+
+    @Value("${app.chat.memory.retain-threshold}")
+    private int retainThreshold;
 
     // 使用构造器注入 ChatClient.Builder
-    public LlmApiClient(ChatClient.Builder chatClientBuilder) {
+    public LlmApiClient(ChatClient.Builder chatClientBuilder, ChatMemory chatMemory) {
         this.chatClient = chatClientBuilder.build();
+        this.chatMemory = chatMemory;
+
     }
 
-    public String callLlmApi(String prompt) throws Exception {
-
+    /**
+     * @param sessionId 用户ID，用于隔离不同人的聊天记录
+     * @param systemPrompt 包含规则、数据库、长期画像的系统指令
+     * @param userRequest 用户当前的提问
+     */
+    public String callLlmApi(String sessionId, String systemPrompt, String userRequest) throws AppException {
         try {
-            String responseContent = this.chatClient.prompt()
-                    .user(prompt)
+
+            ChatResponse response = chatClient.prompt()
+                    .system(systemPrompt)
+                    .user(userRequest)
+                    .advisors(new MessageChatMemoryAdvisor(chatMemory, sessionId, retainThreshold))
                     .call()
-                    .content();
+                    .chatResponse();
 
-            log.info("【大模型原始完整输出】:\n{}", responseContent);
+            if (response == null || response.getResult() == null) {
+                throw new AppException(ResponseCode.LLM_PARSE_ERROR);
+            }
 
-            // 2. 清理模型的 <think> 思考过程标签
-            return cleanThinkTags(responseContent);
+            // 3. 提取内容
+            String fullContent = response.getResult().getOutput().getContent();
+            String answer = fullContent;
+
+            int thinkEndIndex = fullContent.indexOf("</think>");
+            if (thinkEndIndex != -1) {
+                answer = fullContent.substring(thinkEndIndex + 8).trim();
+            }
+
+            log.info("【大模型最终输出】: {}", answer);
+            return answer;
 
         } catch (Exception e) {
-            // 如果遇到网络不通、503、连接拒绝等问题，Spring AI 会自动抛出异常被这里捕获
-            log.error("Spring AI 调用大模型失败", e);
+                log.error("本地大模型调用失败", e);
             throw new AppException(ResponseCode.LLM_API_ERROR);
         }
     }
 
-    public String callLlmForJson(String prompt) {
-        try {
-            return this.chatClient.prompt()
-                    .user(prompt)
-                    // 强制底层 API 只允许输出 JSON
-                    .options(OpenAiChatOptions.builder()
-                            .withResponseFormat(new ChatCompletionRequest.ResponseFormat(ChatCompletionRequest.ResponseFormat.Type.JSON_OBJECT))
-                            .withTemperature(0.1)
-                            .build())
-                    .call()
-                    .content();
-
-        } catch (Exception e) {
-            log.error("大模型生成 JSON 失败", e);
-            return null;
-        }
-    }
-
-    /**
-     * 提取出你之前写的过滤 <think> 标签的逻辑
-     */
-    private String cleanThinkTags(String finalRes) throws AppException {
-        if (!StringUtils.hasText(finalRes)) {
-            throw new AppException(ResponseCode.LLM_PARSE_ERROR.getCode(), "解析异常：模型返回的数据为空");
-        }
-
-        int thinkEndIndex = finalRes.indexOf("</think>");
-        if (thinkEndIndex != -1) {
-            // 找到了 </think>，直接把这个标签及其之前的所有“草稿”全部丢弃
-            return finalRes.substring(thinkEndIndex + "</think>".length()).trim();
-        } else {
-            // 没找到 think 标签，直接返回原文
-            return finalRes.trim();
-        }
-    }
 }

@@ -19,9 +19,6 @@ public class SchoolLlmService {
     private SchoolMapper schoolMapper;
 
     @Autowired
-    private ShortMemoryService shortMemoryService;
-
-    @Autowired
     private LongMemoryService longMemoryService;
 
     @Autowired
@@ -43,19 +40,12 @@ public class SchoolLlmService {
         log.info("成功获取学校数据，当前数据长度: {} 字符，即将进入 Prompt 构建与模型调用环节...", schoolData.length());
 
         String summary = longMemoryService.getSummary(sessionId);
-        String historyContext = shortMemoryService.getHistoryContext(sessionId);
 
         // 2. 构建 Prompt
-        String prompt = buildPrompt(schoolData, userRequirement, historyContext, summary);
-        log.info("已构建Prompt: \n {}", prompt);
+        String systemPrompt = buildSystemPrompt(schoolData, summary);
+        log.info("已构建 systemPrompt.");
 
-        String llmResult = llmApiClient.callLlmApi(prompt);
-
-        // 5. 将当前这一轮的用户输入和模型输出存入 Redis 记忆中
-        shortMemoryService.addMessage(sessionId, "User", userRequirement);
-        String evictedMessages = shortMemoryService.addMessage(sessionId, "Assistant", llmResult);
-
-        longMemoryService.handleMemoryCompression(sessionId, evictedMessages, summary);
+        String llmResult = llmApiClient.callLlmApi(sessionId, systemPrompt, userRequirement);
 
         // 3. 调用大模型并返回结果
         return llmResult;
@@ -85,6 +75,23 @@ public class SchoolLlmService {
             }
         }
         return sb.toString();
+    }
+
+
+    private String buildSystemPrompt(String schoolData, String summary) {
+        StringBuilder systemBuilder = new StringBuilder();
+
+        systemBuilder.append("你是爱康优申集团的一个专业的智能择校助手。请严格基于我提供的【学校数据库】信息，分析【用户需求】，推荐最匹配的一所或多所学校，并用中文分点说明推荐理由。");
+        systemBuilder.append("你需要参考【历史对话记录】和【摘要】（如果有）来理解用户的上下文语境。\n\n");
+        systemBuilder.append("如果用户使用指代词，必须强制检索前 3 轮对话中的实体（Entity）。如果无法确定，请礼貌追问，禁止猜测。");
+
+        systemBuilder.append("【学校数据库】:\n").append(schoolData).append("\n\n");
+
+        if (StringUtils.hasText(summary)) {
+            systemBuilder.append("【当前用户的长期偏好画像】:\n").append(summary).append("\n\n");
+        }
+
+        return systemBuilder.toString();
     }
 
     public String buildPrompt(String data, String requirement,  String historyContext, String summary) {
