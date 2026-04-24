@@ -5,6 +5,8 @@ import com.icon.agent00.entity.SchoolDAO;
 import com.icon.agent00.types.enums.ResponseCode;
 import com.icon.agent00.types.exeption.AppException;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RedissonClient;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -22,7 +24,11 @@ public class SchoolLlmService {
     private LongMemoryService longMemoryService;
 
     @Autowired
-    private LlmApiClient llmApiClient;
+    private LlmApiClientAlibaba llmApiClientAlibaba;
+
+    @Autowired
+    private ReActAgent reActAgent;
+
     /**
      * 根据需求获取推荐
      */
@@ -39,13 +45,11 @@ public class SchoolLlmService {
 
         log.info("成功获取学校数据，当前数据长度: {} 字符，即将进入 Prompt 构建与模型调用环节...", schoolData.length());
 
-        String summary = longMemoryService.getSummary(sessionId);
-
         // 2. 构建 Prompt
-        String systemPrompt = buildSystemPrompt(schoolData, summary);
+        String systemPrompt = buildSystemPrompt(schoolData);
         log.info("已构建 systemPrompt.");
 
-        String llmResult = llmApiClient.callLlmApi(sessionId, systemPrompt, userRequirement);
+        String llmResult = reActAgent.callLlmApi(sessionId, systemPrompt, userRequirement);
 
         // 3. 调用大模型并返回结果
         return llmResult;
@@ -78,7 +82,7 @@ public class SchoolLlmService {
     }
 
 
-    private String buildSystemPrompt(String schoolData, String summary) {
+    private String buildSystemPrompt(String schoolData) {
         StringBuilder systemBuilder = new StringBuilder();
 
         systemBuilder.append("你是爱康优申集团的一个专业的智能择校助手。请严格基于我提供的【学校数据库】信息，分析【用户需求】，推荐最匹配的一所或多所学校，并用中文分点说明推荐理由。");
@@ -86,10 +90,6 @@ public class SchoolLlmService {
         systemBuilder.append("如果用户使用指代词，必须强制检索前 3 轮对话中的实体（Entity）。如果无法确定，请礼貌追问，禁止猜测。");
 
         systemBuilder.append("【学校数据库】:\n").append(schoolData).append("\n\n");
-
-        if (StringUtils.hasText(summary)) {
-            systemBuilder.append("【当前用户的长期偏好画像】:\n").append(summary).append("\n\n");
-        }
 
         return systemBuilder.toString();
     }

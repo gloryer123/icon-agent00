@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
@@ -86,8 +87,8 @@ public class LongMemoryService {
             String newSummary = this.chatClient.prompt()
                     .system(summaryPrompt)
                     .options(OpenAiChatOptions.builder()
-                            .withResponseFormat(new OpenAiApi.ChatCompletionRequest.ResponseFormat(OpenAiApi.ChatCompletionRequest.ResponseFormat.Type.JSON_OBJECT))
-                            .withTemperature(0.1)
+                            .responseFormat(new ResponseFormat())
+                            .temperature(0.1)
                             .build())
                     .call()
                     .content();

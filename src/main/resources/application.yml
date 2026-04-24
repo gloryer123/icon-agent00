@@ -6,6 +6,9 @@ spring:
       chat:
         options:
           model: qwen3.5-9b-q8:latest
+      embedding:
+        options:
+          model: qwen3-embedding:8b
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
